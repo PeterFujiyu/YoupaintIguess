@@ -1,0 +1,6 @@
+{
+  "_comment": "你可以在本文件中添加任意词条，每个难度是一个数组。翻译文件中没有的词将使用英文。",
+  "easy": ["apple", "cat", "sun", "fish","dog"],
+  "medium": ["giraffe", "helicopter", "pyramid","market","ink"],
+  "hard": ["whale","firework"]
+}

@@ -1,0 +1,30 @@
+{
+  "title": "You Paint I Guess",
+  "difficulty": {
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Hard"
+  },
+  "words": {
+    "apple": "Apple",
+    "cat": "Cat",
+    "sun": "Sun",
+    "fish": "Fish",
+    "giraffe": "Giraffe",
+    "helicopter": "Helicopter",
+    "pyramid": "Pyramid",
+    "democracy": "Democracy",
+    "whale": "Whale",
+    "firework": "Firework",
+    "ink": "Ink"
+  },
+  "buttons": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "clear": "Clear",
+    "next": "Next",
+    "reshuffle": "Reshuffle",
+    "language": "Language",
+    "start": "Start"
+  }
+}

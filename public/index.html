@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">YouPaintIGuess</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      font-family: sans-serif;
+    }
+    #canvas {
+      flex: 1;
+      background: #fff8e1;
+      cursor: crosshair;
+      position: relative;
+    }
+    #sidebar {
+      width: 250px;
+      background: #f0f0f0;
+      padding: 1em;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+      font-size: 100%;
+    }
+    .word-group {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 0.5em;
+    }
+    .word-group h3 {
+      margin: 0.2em 0;
+    }
+    button, select {
+      margin: 0.25em 0;
+    }
+    .word-display {
+      font-weight: bold;
+      padding-top: 0.5em;
+    }
+    #countdown-overlay {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 2em;
+      font-weight: bold;
+      color: #d32f2f;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .word-display {
+      font-weight: bold;
+      padding-top: 0.5em;
+      font-size: 3em;
+    }
+  </style>
+</head>
+<body>
+  <div style="position: relative; flex: 1;">
+    <canvas id="canvas"></canvas>
+    <div id="countdown-overlay"></div>
+  </div>
+  <div id="sidebar">
+    <select id="lang-selector">
+      <option value="zh">中文</option>
+      <option value="en">English</option>
+    </select>
+
+    <select id="font-size-selector">
+      <option value="50%">50%</option>
+      <option value="75%">75%</option>
+      <option value="100%" selected>100%</option>
+      <option value="125%">125%</option>
+      <option value="150%">150%</option>
+    </select>
+
+    <div class="word-display" id="current-word"></div>
+
+    <button id="undoBtn">Undo</button>
+    <button id="redoBtn">Redo</button>
+    <button id="clearBtn">Clear</button>
+    <button id="nextBtn">Next</button>
+    <button id="reshuffleBtn">Reshuffle</button>
+
+    <div class="word-group">
+      <h3 id="label-easy">Easy</h3>
+      <ul id="words-easy"></ul>
+    </div>
+    <div class="word-group">
+      <h3 id="label-medium">Medium</h3>
+      <ul id="words-medium"></ul>
+    </div>
+    <div class="word-group">
+      <h3 id="label-hard">Hard</h3>
+      <ul id="words-hard"></ul>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const countdownEl = document.getElementById('countdown-overlay');
+    const sidebar = document.getElementById('sidebar');
+    let drawing = false;
+    let startedDrawing = false;
+    let history = [];
+    let redoStack = [];
+    let wordsData = { easy: [], medium: [], hard: [] };
+    let currentDifficulty = null;
+    let currentWord = '';
+    let countdownTimer = null;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth - 250;
+      canvas.height = window.innerHeight;
+      ctx.fillStyle = '#fff8e1';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#fff8e1';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      countdownEl.textContent = '';
+      clearInterval(countdownTimer);
+      startedDrawing = false;
+    }
+
+    function saveState() {
+      history.push(canvas.toDataURL());
+      if (history.length > 100) history.shift();
+      redoStack = [];
+    }
+
+    function randomFrom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function smartTranslate(word, dictSection) {
+      if (dictSection && word in dictSection) return dictSection[word];
+      return word
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
+
+    function startCountdown(difficulty) {
+      const durations = { easy: 30, medium: 60, hard: 75 };
+      let seconds = durations[difficulty];
+      countdownEl.textContent = seconds;
+      countdownTimer = setInterval(() => {
+        seconds--;
+        countdownEl.textContent = seconds;
+        if (seconds <= 0) {
+          clearInterval(countdownTimer);
+          ctx.fillStyle = 'rgba(0,0,0,0.7)';
+          ctx.fillRect(0, canvas.height / 2 - 30, canvas.width, 60);
+          ctx.fillStyle = '#fff';
+          ctx.font = '32px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(currentWord, canvas.width / 2, canvas.height / 2 + 10);
+        }
+      }, 1000);
+    }
+
+    function loadLanguage(lang) {
+      fetch(`/i18n/${lang}.json`)
+        .then(res => res.json())
+        .then(dict => {
+          window.dict = dict;
+          document.title = dict.title;
+          document.getElementById('page-title').textContent = dict.title;
+          document.getElementById('label-easy').textContent = smartTranslate('easy', dict.difficulty);
+          document.getElementById('label-medium').textContent = smartTranslate('medium', dict.difficulty);
+          document.getElementById('label-hard').textContent = smartTranslate('hard', dict.difficulty);
+
+          document.getElementById('undoBtn').textContent = smartTranslate('undo', dict.buttons);
+          document.getElementById('redoBtn').textContent = smartTranslate('redo', dict.buttons);
+          document.getElementById('clearBtn').textContent = smartTranslate('clear', dict.buttons);
+          document.getElementById('nextBtn').textContent = smartTranslate('next', dict.buttons);
+          document.getElementById('reshuffleBtn').textContent = smartTranslate('reshuffle', dict.buttons);
+
+          fetch('/themes/words.json?_t=' + Date.now())
+            .then(res => res.json())
+            .then(words => {
+              wordsData = words;
+              const wordDisplay = document.getElementById('current-word');
+
+              const appendWords = (ulId, words, level) => {
+                const ul = document.getElementById(ulId);
+                ul.innerHTML = '';
+                words.forEach(word => {
+                  const li = document.createElement('li');
+                  li.textContent = smartTranslate(word, dict.words);
+                  li.style.cursor = 'pointer';
+                  li.onclick = () => {
+                    clearCanvas();
+                    currentDifficulty = level;
+                    currentWord = smartTranslate(word, dict.words);
+                    wordDisplay.textContent = currentWord;
+                    wordDisplay.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  };
+                  ul.appendChild(li);
+                });
+              };
+
+              appendWords('words-easy', words.easy, 'easy');
+              appendWords('words-medium', words.medium, 'medium');
+              appendWords('words-hard', words.hard, 'hard');
+
+              document.getElementById('nextBtn').onclick = () => {
+                clearCanvas();
+                wordDisplay.textContent = '';
+                currentDifficulty = null;
+                currentWord = '';
+              };
+
+              document.getElementById('reshuffleBtn').onclick = () => {
+                if (!currentDifficulty || !wordsData[currentDifficulty]) return;
+                const word = randomFrom(wordsData[currentDifficulty]);
+                currentWord = smartTranslate(word, dict.words);
+                wordDisplay.textContent = currentWord;
+                wordDisplay.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                clearCanvas();
+              };
+            });
+        });
+    }
+
+    document.getElementById('lang-selector').value = localStorage.getItem('lang') || 'zh';
+    document.getElementById('lang-selector').addEventListener('change', e => {
+      localStorage.setItem('lang', e.target.value);
+      location.reload();
+    });
+
+    document.getElementById('font-size-selector').addEventListener('change', e => {
+      sidebar.style.fontSize = e.target.value;
+    });
+
+    resizeCanvas();
+    loadLanguage(localStorage.getItem('lang') || 'zh');
+
+    canvas.addEventListener('mousedown', e => {
+      if (!startedDrawing && currentDifficulty) {
+        startedDrawing = true;
+        startCountdown(currentDifficulty);
+      }
+      saveState();
+      drawing = true;
+      ctx.beginPath();
+      ctx.moveTo(e.offsetX, e.offsetY);
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (drawing) {
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.stroke();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => drawing = false);
+    canvas.addEventListener('mouseleave', () => drawing = false);
+
+    document.getElementById('undoBtn').onclick = () => {
+      if (history.length === 0) return;
+      redoStack.push(canvas.toDataURL());
+      const img = new Image();
+      img.src = history.pop();
+      img.onload = () => ctx.drawImage(img, 0, 0);
+    };
+
+    document.getElementById('redoBtn').onclick = () => {
+      if (redoStack.length === 0) return;
+      history.push(canvas.toDataURL());
+      const img = new Image();
+      img.src = redoStack.pop();
+      img.onload = () => ctx.drawImage(img, 0, 0);
+    };
+
+    document.getElementById('clearBtn').onclick = () => {
+      clearCanvas();
+      history = [];
+      redoStack = [];
+    };
+  </script>
+</body>
+</html>

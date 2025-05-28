@@ -1,0 +1,31 @@
+{
+  "title": "你画我猜",
+  "difficulty": {
+    "easy": "简单",
+    "medium": "中等",
+    "hard": "困难"
+  },
+  "words": {
+    "apple": "苹果",
+    "cat": "猫",
+    "sun": "太阳",
+    "fish": "鱼",
+    "dog": "狗",
+    "giraffe": "长颈鹿",
+    "helicopter": "直升机",
+    "pyramid": "金字塔",
+    "market": "市场",
+    "whale": "鲸鱼",
+    "firework": "烟花",
+    "ink": "墨水"
+  },
+  "buttons": {
+    "undo": "撤销",
+    "redo": "重做",
+    "clear": "清空画布",
+    "next": "下一题",
+    "reshuffle": "换一个",
+    "language": "语言",
+    "start": "开始"
+  }
+}
